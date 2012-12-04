@@ -1,0 +1,50 @@
+name: Totems
+main: com.thespuff.plugins.totems.Totems
+author: nathanaelps
+version: a0.1
+commands:
+  tr:
+    description: Reload Totems
+    usage: /tr
+  totemgoto:
+    description: Go to a specific
+    usage: /totemgoto [totemname]
+  whose:
+    description: Who owns this area?
+    usage: /whose
+  tfriend:
+    description: Permit friends to build!
+    usage: /tfriend [playerName]
+  tunfriend:
+    description: Unfriend your friends!
+    usage: /tunfriend [playerName]
+  totemprotect:
+    description: Protect an area
+    usage: /totemprotect
+  setTotemDefault:
+    description: Set the default flag for the current world.
+    usage: /setTotemDefault [Flag] [true|false]
+permissions:
+    totems.*:
+        default: op
+        children:
+            totems.freebuild: true
+            totems.build: true
+            totems.admin.unrestricted: true
+    totems.build:
+        default: true
+    totems.admin:
+        default: op
+        children:
+            totems.admin.unrestricted: true
+            totems.admin.reload: true
+            totems.admin.setDefault: true
+            totems.admin.setFlag: true
+    totems.command.whose:
+        default: true
+    totems.command.createTotem:
+        default: false
+    totems.command.addFlag:
+        default: false
+    totems.special.mayFly:
+        default: false
