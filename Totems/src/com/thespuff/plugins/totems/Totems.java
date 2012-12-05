@@ -239,7 +239,7 @@ public class Totems extends JavaPlugin implements Listener {
 					flags.put("explode", false);
 					flags.put("firespread", false);
 					flags.put("place", false);
-					radius = 10f;
+					radius = 3f;
 					break;
 				default:
 					return;
