@@ -9,6 +9,8 @@ import org.bukkit.Server;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 
+import com.thespuff.plugins.totems.Totems.Interaction;
+
 public class Utils {
 
 //	private static String pluginName = Totems.pluginName;
@@ -25,6 +27,14 @@ public class Utils {
 			}catch(NullPointerException e) {/*Do Nothing*/}
 		}
 		return out;
+	}
+
+	public static boolean setWorldDefault(World world, String flag, boolean wDefault) {
+		if(Interaction.valueOf(flag.toUpperCase()) == null) { return false; }
+		
+		plugin.getConfig().set("totems."+world.getName()+".defaults."+flag.toLowerCase(), wDefault);
+		
+		return true;
 	}
 	
 	public static HashMap<String,Block> getTotems(Object world){
@@ -61,29 +71,38 @@ public class Utils {
 		return out;
 	}
 	
-	public static HashMap<String,Double> getTotemsAtLocation(Location location) {
+	public static HashMap<String,Double> getTotemsAffectingLocation(Location location) {
+		return getTotemsAffectingLocation(location.getBlock());
+	}
+	
+	public static HashMap<String,Double> getTotemsAffectingLocation(Block block) {
 		String path = "";
-		String world = location.getWorld().getName();
+		String world = block.getWorld().getName();
 		HashMap<String,Double> out = new HashMap<String,Double>();
 		double radius = 0.0;
 		int tX,tY,tZ;
-		int x = location.getBlockX();
-		int y = location.getBlockY();
-		int z = location.getBlockZ();
+		int x = block.getX();
+		int y = block.getY();
+		int z = block.getZ();
 		
 		Set<String> totems = plugin.getConfig().getConfigurationSection("totems."+world).getKeys(false);
 		for(String totem:totems){
 			if(totem.equals("defaults")) { continue; }
 			path = "totems."+world+"."+totem;
 			radius = plugin.getConfig().getDouble(path+".radius");
-			tX = plugin.getConfig().getInt(path+".x");
-			if(Math.abs(tX-x)>radius) { continue; }
-			tZ = plugin.getConfig().getInt(path+".z");
-			if(Math.abs(tZ-z)>radius) { continue; }
-			tY = plugin.getConfig().getInt(path+".y");
-			if(Math.abs(tY-y)>radius) { continue; }
-			out.put(totem, ((tX+tZ+tY)/(3*radius)));
+			tX = Math.abs(plugin.getConfig().getInt(path+".x")-x);
+			if(tX>radius) { continue; }
+			tZ = Math.abs(plugin.getConfig().getInt(path+".z")-z);
+			if(tZ>radius) { continue; }
+			tY = Math.abs(plugin.getConfig().getInt(path+".y")-y);
+			if(tY>radius) { continue; }
+			out.put(totem, 1-((tX+tZ+tY)/(3*radius)));
 		}
 		return out;
+	}
+
+	public static void getTotem(Block totemBlock) {
+		// TODO Auto-generated method stub
+		
 	}
 }

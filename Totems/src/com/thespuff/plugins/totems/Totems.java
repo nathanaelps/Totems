@@ -9,9 +9,7 @@ import java.util.Set;
 
 import org.bukkit.GameMode;
 import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.Server;
-import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
@@ -92,7 +90,7 @@ public class Totems extends JavaPlugin implements Listener {
 		pluginVersion = this.getDescription().getVersion();
 		server = this.getServer();
 		plugin = this;
-		int secondsPerPulse = 3;
+		int secondsPerPulse = 8;
 
 		getServer().getPluginManager().registerEvents(this, this);
 		
@@ -195,6 +193,7 @@ public class Totems extends JavaPlugin implements Listener {
 				String owner = this.getConfig().getString("totems."+world+"."+serial+".owner");
 				if(owner.equalsIgnoreCase(player)) {
 					this.getConfig().set("totems."+world+"."+serial, null);
+					event.getBlock().removeMetadata("Totem", this);
 					event.getPlayer().sendMessage("You broke a totem!");
 					saveConfig();
 				} else {
@@ -486,69 +485,67 @@ public class Totems extends JavaPlugin implements Listener {
 	}
 	
 	public boolean canEdit(String playerName, Location location, Interaction flag) {
-		double radius;
-		int x = location.getBlockX();
-		int y = location.getBlockY();
-		int z = location.getBlockZ();
-		int tX, tY, tZ;
 		boolean defaultTo = true;
 		double permissionScale = 0.0;
 		String path;
 		String worldName = location.getWorld().getName();
 		boolean flagValue, isOwner;
-		
+		String flagName = flag.getName().toLowerCase();
+
 		try{
-			Set<String> totems = getConfig().getConfigurationSection("totems."+worldName).getKeys(false);
-			if(getConfig().contains("totems.defaults."+flag.getName().toLowerCase())){
-				defaultTo = getConfig().getBoolean("totems.defaults."+flag.getName().toLowerCase());
+//			Set<String> totems = getConfig().getConfigurationSection("totems."+worldName).getKeys(false);
+			if(getConfig().contains("totems.defaults."+flagName)){
+				defaultTo = getConfig().getBoolean("totems.defaults."+flagName);
 			}
-			if(getConfig().contains("totems."+worldName+".defaults."+flag.getName().toLowerCase())){
-				defaultTo = getConfig().getBoolean("totems."+worldName+".defaults."+flag.getName().toLowerCase());
+			if(getConfig().contains("totems."+worldName+".defaults."+flagName)){
+				defaultTo = getConfig().getBoolean("totems."+worldName+".defaults."+flagName);
 			}
-			for(String totem:totems){
-				if(totem.equals("defaults")) { continue; }
-				path = "totems."+worldName+"."+totem;
-				if(!getConfig().contains(path+".flags."+flag.getName().toLowerCase())) { continue; }
-				flagValue = getConfig().getBoolean(path+".flags."+flag.getName().toLowerCase());
-				radius = getConfig().getDouble(path+".radius");
-				
-				tX = Math.abs(getConfig().getInt(path+".x")-x);
-				if(tX>radius) { continue; }
-				tZ = Math.abs(getConfig().getInt(path+".z")-z);
-				if(tZ>radius) { continue; }
-				tY = Math.abs(getConfig().getInt(path+".y")-y);
-				if(tY>radius) { continue; }
-				
+						
+			HashMap<String, Double> totems = Utils.getTotemsAffectingLocation(location);
+			Set<String> keys = totems.keySet();
+			
+			for(String key:keys){
+				path = "totems."+worldName+"."+key;
 				try{ //if we are in the radius of a totem,
-					double permissionDelta = ((tX+tZ+tY)/(3*radius));
+					if(getConfig().contains(path+".flags."+flagName)){
+						flagValue = getConfig().getBoolean(path+".flags."+flagName);
+					} else {
+						flagValue = defaultTo;
+					}
 					String ownerName = getConfig().getString(path+".owner").toLowerCase();
-					if(ownerName.equalsIgnoreCase(playerName)) {//and we are owner,
+					if(ownerName.equalsIgnoreCase(playerName) || //if I own this totem, or
+							getConfig().getBoolean("totems.groups."+ownerName+"."+playerName.toLowerCase()) || //you're a friend to me or
+							getConfig().getStringList(path+".friends").contains(playerName.toLowerCase())) {//you're a friend of this totem
 						//add distance-from-center weight to true
 						isOwner = true;
-					} else if(getConfig().getStringList(path+".friends").contains(playerName.toLowerCase())) {//if we are just friends,
-						//add distance-from-center weight to true
-						isOwner = true;
-					} else if(getConfig().contains("totems.groups."+ownerName+"."+playerName.toLowerCase())) {
-						//add distance-from-center weight to true
-						isOwner = getConfig().getBoolean("totems.groups."+ownerName+"."+playerName.toLowerCase());
 					} else {//if it's not our totem, or our friend's totem,
 						//add distance-from-center weight to false
 						isOwner = false;
 					}
-					if(isOwner != flagValue) {
-						if(defaultTo) { permissionScale += permissionDelta; }
-						else { permissionScale -= permissionDelta; }
+/*					if(isOwner != defaultTo) {
+						if(flagValue) { permissionScale += totems.get(key); }
+						else { permissionScale -= totems.get(key); }
 					} else {
-						if(isOwner) { permissionScale += permissionDelta; }
-						else { permissionScale -= permissionDelta; }
+						if(isOwner) { permissionScale += totems.get(key); }
+						else { permissionScale -= totems.get(key); }
 					}
+*/
+					if(isOwner != flagValue) {
+						if(defaultTo) { permissionScale += totems.get(key); }
+						else { permissionScale -= totems.get(key); }
+					} else {
+						if(isOwner) { permissionScale += totems.get(key); }
+						else { permissionScale -= totems.get(key); }
+					}
+
+					
+					
 				} catch (NullPointerException f) { }
 			}
 		} catch (NullPointerException e) { }
-		
+
 		if(permissionScale==0) { return defaultTo; }
-		return (permissionScale>0);	
-	
+		return (permissionScale>0);
 	}
 
 	
@@ -557,6 +554,10 @@ public class Totems extends JavaPlugin implements Listener {
 	public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args){
 		String command = cmd.getName();
 
+		if(command.equalsIgnoreCase("tr")){
+			return Commands.reloadConfig(sender);
+		}
+
 		if(sender instanceof Player){
 			Player player = (Player) sender;
 			
@@ -564,73 +565,19 @@ public class Totems extends JavaPlugin implements Listener {
 			
 			if(args.length>0){
 				
-			} else if(args.length>1){
+			}
+			
+			if(args.length>1){
 				if(command.equalsIgnoreCase("setTotemDefault")) { return Commands.setTotemDefault(player, args); }
 
 			}
 		}
 		
 		
-		if(cmd.getName().equalsIgnoreCase("tr")){
-			if(((sender instanceof Player) && (sender.hasPermission("totems.admin.reload"))) || !(sender instanceof Player)) {
-				reloadConfig();
-				return true;
-			}
-		}
 		if(sender instanceof Player) {
 			Player player = (Player) sender;
-
-			if(cmd.getName().equalsIgnoreCase("whose")){
-				if(!player.hasPermission("totems.command.whose")) {
-					player.sendMessage("You don't have permissions to ask such questions!");
-					return true;
-				}
-				double radius;
-				Location location = player.getLocation();
-				int x = location.getBlockX();
-				int y = location.getBlockY();
-				int z = location.getBlockZ();
-				int tX, tY, tZ;
-				String path;
-				
-				try{
-					Set<String> totems = this.getConfig().getConfigurationSection("totems."+location.getWorld().getName()).getKeys(false);
-					for(String totem:totems){
-						path = "totems."+location.getWorld().getName()+"."+totem;
-						radius = this.getConfig().getDouble(path+".radius");
-						tX = this.getConfig().getInt(path+".x");
-						if(Math.abs(tX-x)>radius) { continue; }
-						tZ = this.getConfig().getInt(path+".z");
-						if(Math.abs(tZ-z)>radius) { continue; }
-						tY = this.getConfig().getInt(path+".y");
-						if(Math.abs(tY-y)>radius) { continue; }
-						player.sendMessage("This area is protected by "+this.getConfig().getString(path+".owner"));
-						return true;
-					}
-					player.sendMessage("This area is not protected.");
-					return true;
-				} catch (NullPointerException e) {
-					log("NPE in onCommand.whose");
-				}
-				return true;
-			}
-
-			if(cmd.getName().equalsIgnoreCase("setTotemDefault")){
-				if(!player.hasPermission("totems.admin.setDefault")) {
-					player.sendMessage("You don't have permissions to set world default flags!");
-					return true;
-				}
-				if(args.length<2) { return false; }
-				String wDefaultS = args[1];
-				if(setWorldDefault(player.getWorld(), args[0], wDefaultS.equalsIgnoreCase("true"))){
-					log("Flag "+ args[0] + " now defaults to " + wDefaultS + " for world " + player.getWorld().getName() +".");
-				} else {
-					log("Bad flag!");
-				}
-				return true;
-			}
 			
-			if(cmd.getName().equalsIgnoreCase("totemCreate")){
+/*			if(cmd.getName().equalsIgnoreCase("totemCreate")){
 				if(!player.hasPermission("totems.command.createTotem")) {
 					player.sendMessage("Totems are not free!");
 					return true;
@@ -659,7 +606,7 @@ public class Totems extends JavaPlugin implements Listener {
 
 				return true;
 			}
-
+*/
 			if(cmd.getName().equalsIgnoreCase("totemFlag")){
 				if(!player.hasPermission("totems.command.addFlag")) {
 					player.sendMessage("You don't have permission to add flags for free!");
@@ -674,6 +621,7 @@ public class Totems extends JavaPlugin implements Listener {
 				String path = "";
 
 				try{
+					Utils.getTotem(totemBlock);
 					Set<String> totems = this.getConfig().getConfigurationSection("totems."+player.getWorld().getName()).getKeys(false);
 					for(String totem:totems){
 						path = "totems."+player.getWorld().getName()+"."+totem;
@@ -747,14 +695,6 @@ public class Totems extends JavaPlugin implements Listener {
 			}
 		}
 		return null;
-	}
-
-	public boolean setWorldDefault(World world, String flag, boolean wDefault) {
-		if(Interaction.valueOf(flag.toUpperCase()) == null) { return false; }
-		
-		getConfig().set("totems."+world.getName()+".defaults."+flag.toLowerCase(), wDefault);
-		
-		return true;
 	}
 
 	public boolean setTotemFlag(Location loc, Player player, String flag, String sValue) {
