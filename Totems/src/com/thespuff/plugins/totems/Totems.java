@@ -215,7 +215,6 @@ public class Totems extends JavaPlugin implements Listener {
 			if(!canEdit(event.getPlayer(),event.getClickedBlock().getLocation(),Interaction.PLACE)) { return; }
 			if(event.getItem().getTypeId()!=284) { return; } //Gold Spade
 			if(event.getClickedBlock().hasMetadata("Totem")) { return; }
-//			if(event.getClickedBlock().getTypeId()!=57) { return; } //Diamond Block
 
 			HashMap<String,Boolean> flags = new HashMap<String,Boolean>();
 			float radius = 5;
@@ -473,6 +472,7 @@ public class Totems extends JavaPlugin implements Listener {
 	/* canEdit, the queen of Sea-Cows =======================================================================*/
 	
 	public boolean canEdit(Player player, Location location, Interaction flag) {
+		if(player.isOp()) { return true; }
 		return canEdit(player.getName(), location, flag);
 	}
 	
@@ -481,6 +481,7 @@ public class Totems extends JavaPlugin implements Listener {
 	}
 	
 	public boolean canEdit(Player player, Location location, String flag) {
+		if(player.isOp()) { return true; }
 		return canEdit(player.getName(), location, Interaction.valueOf(flag.toUpperCase()));
 	}
 	
@@ -522,14 +523,7 @@ public class Totems extends JavaPlugin implements Listener {
 						//add distance-from-center weight to false
 						isOwner = false;
 					}
-/*					if(isOwner != defaultTo) {
-						if(flagValue) { permissionScale += totems.get(key); }
-						else { permissionScale -= totems.get(key); }
-					} else {
-						if(isOwner) { permissionScale += totems.get(key); }
-						else { permissionScale -= totems.get(key); }
-					}
-*/
+
 					if(isOwner != flagValue) {
 						if(defaultTo) { permissionScale += totems.get(key); }
 						else { permissionScale -= totems.get(key); }
@@ -680,20 +674,21 @@ public class Totems extends JavaPlugin implements Listener {
 		return false;
 	}
 	
-	private Block getBlock(String lowerCase) {
+	private Block getBlock(String totem) {
 		String path="";
 		Set<String> worlds = this.getConfig().getConfigurationSection("totems").getKeys(false);
 		for(String world : worlds){
 			if(server.getWorld(world)==null) { continue; }
-			Set<String> totems = this.getConfig().getConfigurationSection("totems."+world).getKeys(false);
-			for(String totem:totems){
+//			Set<String> totems = this.getConfig().getConfigurationSection("totems."+world).getKeys(false);
+//			for(String totem:totems){
 				path = "totems."+world+"."+totem;
+				if(!getConfig().contains(path)) { return null; }
 				int x = getConfig().getInt(path+".x");
 				int z = getConfig().getInt(path+".z");
 				int y = getConfig().getInt(path+".y");
 				return server.getWorld(world).getBlockAt(x, y, z);
 			}
-		}
+//		}
 		return null;
 	}
 
