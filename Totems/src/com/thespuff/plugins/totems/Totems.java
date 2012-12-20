@@ -32,6 +32,7 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerShearEntityEvent;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitTask;
 
 public class Totems extends JavaPlugin implements Listener {
 
@@ -39,7 +40,7 @@ public class Totems extends JavaPlugin implements Listener {
 	public static String pluginVersion;
 	public static Server server;
 	public static Totems plugin;
-	public static int asyncTaskID;
+	public static BukkitTask asyncTask;
 
 	public enum Interaction {
 		ANVIL,
@@ -77,7 +78,7 @@ public class Totems extends JavaPlugin implements Listener {
 	}
 
 	public void onDisable() {
-		this.getServer().getScheduler().cancelTask(asyncTaskID);//cancelAllTasks();
+		this.getServer().getScheduler().cancelTask(asyncTask.getTaskId());//cancelAllTasks();
 		
 		this.saveConfig();
 		setTotemMetadata(false);
@@ -102,7 +103,8 @@ public class Totems extends JavaPlugin implements Listener {
 		
 		setTotemMetadata(true);
 
-		asyncTaskID = this.getServer().getScheduler().scheduleAsyncRepeatingTask(this, new Runnable() { public void run() { applyFlagEffects(); } }, 60, secondsPerPulse*20);
+//		asyncTaskID = this.getServer().getScheduler().scheduleAsyncRepeatingTask(this, new Runnable() { public void run() { applyFlagEffects(); } }, 60, secondsPerPulse*20);
+		asyncTask = this.getServer().getScheduler().runTaskTimerAsynchronously(this, new Runnable() { public void run() { applyFlagEffects(); } }, 60, secondsPerPulse*20);
 		
 		log("Enabled.");
 	}
@@ -131,7 +133,7 @@ public class Totems extends JavaPlugin implements Listener {
 			if(!player.hasPermission("totems.special.mayFly")) { //Flight
 				player.setFlySpeed(.1f);
 				if(player.getGameMode()==GameMode.SURVIVAL) {
-					player.setAllowFlight(canEdit(player, player.getLocation(), Interaction.FLY));
+					player.setAllowFlight(canEdit(player, player.getLocation().getBlock(), Interaction.FLY));
 				}
 			}
 		}
@@ -212,7 +214,7 @@ public class Totems extends JavaPlugin implements Listener {
 		try {
 			if(event.isCancelled()) { return; } //Not allowed to interact. Does this ever get called?
 			if(!event.hasBlock()) { return; }
-			if(!canEdit(event.getPlayer(),event.getClickedBlock().getLocation(),Interaction.PLACE)) { return; }
+			if(!canEdit(event.getPlayer(),event.getClickedBlock(),Interaction.PLACE)) { return; }
 			if(event.getItem().getTypeId()!=284) { return; } //Gold Spade
 			if(event.getClickedBlock().hasMetadata("Totem")) { return; }
 
@@ -279,7 +281,7 @@ public class Totems extends JavaPlugin implements Listener {
 	@EventHandler (priority = EventPriority.LOW) public void onBlockBreak(BlockBreakEvent event) {
 //		if(!event.getPlayer().hasPermission("totems.admin.unrestricted")) { return; }
 		if(event.getPlayer().isOp()) { return; }
-		event.setCancelled(!canEdit(event.getPlayer(),event.getBlock().getLocation(),Interaction.BREAK));
+		event.setCancelled(!canEdit(event.getPlayer(),event.getBlock(),Interaction.BREAK));
 	}
 	
 /*	@EventHandler (priority = EventPriority.LOW) public void onBlockSpread(BlockSpreadEvent event) {
@@ -296,23 +298,23 @@ public class Totems extends JavaPlugin implements Listener {
 	@EventHandler public void onBlockPlace(BlockPlaceEvent event) {
 //		if(!event.getPlayer().hasPermission("totems.admin.unrestricted")) { return; }
 		if(event.getPlayer().isOp()) { return; }
-		event.setCancelled(!canEdit(event.getPlayer(),event.getBlock().getLocation(),Interaction.PLACE));
+		event.setCancelled(!canEdit(event.getPlayer(),event.getBlock(),Interaction.PLACE));
 	}
 
 	@EventHandler public void onHangingBreak(HangingBreakEvent event) {
 		switch(event.getCause()){
 		case EXPLOSION:
-			event.setCancelled(!canEdit("NoPlayerEvent",event.getEntity().getLocation(),Interaction.EXPLODE));
+			event.setCancelled(!canEdit("NoPlayerEvent",event.getEntity().getLocation().getBlock(),Interaction.EXPLODE));
 			break;
 		case ENTITY:
 			//Deal with this in onHangingBreakByEntity
 			break;
 		case OBSTRUCTION:
 		case PHYSICS:
-			event.setCancelled(!canEdit("NoPlayerEvent",event.getEntity().getLocation(),Interaction.BREAK));
+			event.setCancelled(!canEdit("NoPlayerEvent",event.getEntity().getLocation().getBlock(),Interaction.BREAK));
 			break;
 		default:
-			event.setCancelled(!canEdit("NoPlayerEvent",event.getEntity().getLocation(),Interaction.BREAK));
+			event.setCancelled(!canEdit("NoPlayerEvent",event.getEntity().getLocation().getBlock(),Interaction.BREAK));
 			break;
 		}
 /*		if(event.getCause().equals(RemoveCause.EXPLOSION)) {
@@ -323,30 +325,30 @@ public class Totems extends JavaPlugin implements Listener {
 	@EventHandler public void onHangingBreakByEntity(HangingBreakByEntityEvent event) {
 //		if(!event.getPlayer().hasPermission("totems.admin.unrestricted")) { return; }
 		if(!(event.getRemover() instanceof Player)) {
-			event.setCancelled(!canEdit("NoPlayerEvent",event.getEntity().getLocation(),Interaction.BREAK));
+			event.setCancelled(!canEdit("NoPlayerEvent",event.getEntity().getLocation().getBlock(),Interaction.BREAK));
 		} else {
 			if(((Player) event.getRemover()).isOp()) { return; }			
-			event.setCancelled(!canEdit((Player) event.getRemover(),event.getEntity().getLocation(),Interaction.BREAK));
+			event.setCancelled(!canEdit((Player) event.getRemover(),event.getEntity().getLocation().getBlock(),Interaction.BREAK));
 		}
 	}
 
 	@EventHandler public void onHangingPlace(HangingPlaceEvent event) {
 //		if(!event.getPlayer().hasPermission("totems.admin.unrestricted")) { return; }
 		if(event.getPlayer().isOp()) { return; }			
-		event.setCancelled(!canEdit(event.getPlayer(),event.getEntity().getLocation(),Interaction.PLACE));
+		event.setCancelled(!canEdit(event.getPlayer(),event.getEntity().getLocation().getBlock(),Interaction.PLACE));
 	}
 
 	@EventHandler public void onEntityExplode(EntityExplodeEvent event) {
 //		if(event.getEntity() instanceof LivingEntity) { return; }
-		event.setCancelled(!canEdit("NoPlayerEvent",event.getLocation(),Interaction.EXPLODE));
+		event.setCancelled(!canEdit("NoPlayerEvent",event.getLocation().getBlock(),Interaction.EXPLODE));
 		if(event.isCancelled()) { return; }
 		try{
 			if(event.getEntityType().equals(EntityType.CREEPER)) {
-				event.setCancelled(!canEdit("NoPlayerEvent",event.getLocation(),Interaction.EXPLODECREEPER));
+				event.setCancelled(!canEdit("NoPlayerEvent",event.getLocation().getBlock(),Interaction.EXPLODECREEPER));
 			} else if(event.getEntityType().equals(EntityType.FIREBALL)) {
-				event.setCancelled(!canEdit("NoPlayerEvent",event.getLocation(),Interaction.EXPLODEFIREBALL));
+				event.setCancelled(!canEdit("NoPlayerEvent",event.getLocation().getBlock(),Interaction.EXPLODEFIREBALL));
 			} else if(event.getEntityType().equals(EntityType.PRIMED_TNT)) {
-				event.setCancelled(!canEdit("NoPlayerEvent",event.getLocation(),Interaction.EXPLODETNT));
+				event.setCancelled(!canEdit("NoPlayerEvent",event.getLocation().getBlock(),Interaction.EXPLODETNT));
 			}
 		} catch(NullPointerException e) { return; }
 	}
@@ -354,7 +356,7 @@ public class Totems extends JavaPlugin implements Listener {
 	@EventHandler public void onPlayerBedEnter(PlayerBedEnterEvent event) {
 //		if(!event.getPlayer().hasPermission("totems.admin.unrestricted")) { return; }
 		if(event.getPlayer().isOp()) { return; }
-		event.setCancelled(!canEdit(event.getPlayer(),event.getPlayer().getLocation(),Interaction.BED));
+		event.setCancelled(!canEdit(event.getPlayer(),event.getBed(),Interaction.BED));
 	}
 
 /*	@EventHandler public void onBlockDamage(BlockDamageEvent event) {
@@ -368,8 +370,10 @@ public class Totems extends JavaPlugin implements Listener {
 //		if(!event.getPlayer().hasPermission("totems.admin.unrestricted")) { return; }
 		if(event.getPlayer().isOp()) { return; }
 		int mat;
+		Block block;
 		try{
-			mat = event.getClickedBlock().getTypeId();
+			block = event.getClickedBlock();
+			mat = block.getTypeId();
 		} catch (NullPointerException e) { //Air will give 'null'.
 			return;
 		}
@@ -383,13 +387,13 @@ public class Totems extends JavaPlugin implements Listener {
 			case 131: // tripwire hook
 			case 132: // tripwire
 			case 143: // wood button
-				event.setCancelled(!canEdit(event.getPlayer(),event.getPlayer().getLocation(),Interaction.WOODMACHINE));
+				event.setCancelled(!canEdit(event.getPlayer(),block,Interaction.WOODMACHINE));
 				break;
 			
 			//Stone machines!
 			case 70: // stone plate
 			case 77: // stone button
-				event.setCancelled(!canEdit(event.getPlayer(),event.getPlayer().getLocation(),Interaction.STONEMACHINE));
+				event.setCancelled(!canEdit(event.getPlayer(),block,Interaction.STONEMACHINE));
 				break;
 			
 			//Containers!
@@ -399,17 +403,17 @@ public class Totems extends JavaPlugin implements Listener {
 			case 62: // burning furnace
 			case 84: // jukebox
 			case 117: // brewing stand
-				event.setCancelled(!canEdit(event.getPlayer(),event.getPlayer().getLocation(),Interaction.CONTAINER));
+				event.setCancelled(!canEdit(event.getPlayer(),block,Interaction.CONTAINER));
 				break;
 				
 			//Anvil
 			case 145:
-				event.setCancelled(!canEdit(event.getPlayer(),event.getPlayer().getLocation(),Interaction.ANVIL));
+				event.setCancelled(!canEdit(event.getPlayer(),block,Interaction.ANVIL));
 				break;
 
 			//TelePad
 			case 49:
-				event.setCancelled(!canEdit(event.getPlayer(),event.getPlayer().getLocation(),Interaction.TELEPAD));
+				event.setCancelled(!canEdit(event.getPlayer(),block,Interaction.TELEPAD));
 				break;
 
 			default: break;
@@ -419,20 +423,20 @@ public class Totems extends JavaPlugin implements Listener {
 	@EventHandler public void onPlayerBucketEmpty(PlayerBucketEmptyEvent event) {
 //		if(!event.getPlayer().hasPermission("totems.admin.unrestricted")) { return; }
 		if(event.getPlayer().isOp()) { return; }
-		event.setCancelled(!canEdit(event.getPlayer(),event.getBlockClicked().getRelative(event.getBlockFace()).getLocation(),Interaction.PLACE));
+		event.setCancelled(!canEdit(event.getPlayer(),event.getBlockClicked().getRelative(event.getBlockFace()),Interaction.PLACE));
 		log("water");
 	}
 
 	@EventHandler public void onPlayerShearEntity(PlayerShearEntityEvent event) {
 //		if(!event.getPlayer().hasPermission("totems.admin.unrestricted")) { return; }
 		if(event.getPlayer().isOp()) { return; }
-		event.setCancelled(!canEdit(event.getPlayer(),event.getEntity().getLocation(),Interaction.SHEAR));
+		event.setCancelled(!canEdit(event.getPlayer(),event.getEntity().getLocation().getBlock(),Interaction.SHEAR));
 	}
 
 	@EventHandler public void onPlayerBucketFill(PlayerBucketFillEvent event) {
 //		if(!event.getPlayer().hasPermission("totems.admin.unrestricted")) { return; }
 		if(event.getPlayer().isOp()) { return; }
-		event.setCancelled(!canEdit(event.getPlayer(),event.getBlockClicked().getRelative(event.getBlockFace()).getLocation(),Interaction.BREAK));
+		event.setCancelled(!canEdit(event.getPlayer(),event.getBlockClicked().getRelative(event.getBlockFace()),Interaction.BREAK));
 	}
 
 /*	@EventHandler public void onEntityDamageByEntity(EntityDamageByEntityEvent event) {
@@ -462,34 +466,34 @@ public class Totems extends JavaPlugin implements Listener {
 		if(event.getPlayer() instanceof Player) {
 //			if(!event.getPlayer().hasPermission("totems.admin.unrestricted")) { return; }
 			if(event.getPlayer().isOp()) { return; }
-			event.setCancelled(!canEdit(event.getPlayer(),event.getBlock().getLocation(),Interaction.IGNITE));
+			event.setCancelled(!canEdit(event.getPlayer(),event.getBlock(),Interaction.IGNITE));
 		} else {
-			event.setCancelled(!canEdit("NoPlayerEvent",event.getBlock().getLocation(),Interaction.FIRESPREAD));
+			event.setCancelled(!canEdit("NoPlayerEvent",event.getBlock(),Interaction.FIRESPREAD));
 		}
 	}
 	
 
 	/* canEdit, the queen of Sea-Cows =======================================================================*/
 	
-	public boolean canEdit(Player player, Location location, Interaction flag) {
+	public boolean canEdit(Player player, Block block, Interaction flag) {
 		if(player.isOp()) { return true; }
-		return canEdit(player.getName(), location, flag);
+		return canEdit(player.getName(), block, flag);
 	}
 	
-	public boolean canEdit(String player, Location location, String flag) {
-		return canEdit(player, location, Interaction.valueOf(flag.toUpperCase()));
+	public boolean canEdit(String player, Block block, String flag) {
+		return canEdit(player, block, Interaction.valueOf(flag.toUpperCase()));
 	}
 	
-	public boolean canEdit(Player player, Location location, String flag) {
+	public boolean canEdit(Player player, Block block, String flag) {
 		if(player.isOp()) { return true; }
-		return canEdit(player.getName(), location, Interaction.valueOf(flag.toUpperCase()));
+		return canEdit(player.getName(), block, Interaction.valueOf(flag.toUpperCase()));
 	}
 	
-	public boolean canEdit(String playerName, Location location, Interaction flag) {
+	public boolean canEdit(String playerName, Block block, Interaction flag) {
 		boolean defaultTo = true;
 		double permissionScale = 0.0;
 		String path;
-		String worldName = location.getWorld().getName();
+		String worldName = block.getWorld().getName();
 		boolean flagValue, isOwner;
 		String flagName = flag.getName().toLowerCase();
 
@@ -502,7 +506,7 @@ public class Totems extends JavaPlugin implements Listener {
 				defaultTo = getConfig().getBoolean("totems."+worldName+".defaults."+flagName);
 			}
 						
-			HashMap<String, Double> totems = Utils.getTotemsAffectingLocation(location);
+			HashMap<String, Double> totems = Utils.getTotemsAffectingLocation(block);
 			Set<String> keys = totems.keySet();
 			
 			for(String key:keys){
