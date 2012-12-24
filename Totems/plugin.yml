@@ -1,7 +1,7 @@
 name: Totems
 main: com.thespuff.plugins.totems.Totems
 author: nathanaelps
-version: a0.1
+version: b0.1
 commands:
   tr:
     description: Reload Totems
