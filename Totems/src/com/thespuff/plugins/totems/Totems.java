@@ -4,11 +4,13 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 import org.bukkit.GameMode;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.Server;
 import org.bukkit.block.Block;
 import org.bukkit.command.Command;
@@ -21,6 +23,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockIgniteEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.block.BlockSpreadEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.hanging.HangingBreakByEntityEvent;
 import org.bukkit.event.hanging.HangingBreakEvent;
@@ -29,6 +32,7 @@ import org.bukkit.event.player.PlayerBedEnterEvent;
 import org.bukkit.event.player.PlayerBucketEmptyEvent;
 import org.bukkit.event.player.PlayerBucketFillEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerShearEntityEvent;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -41,6 +45,7 @@ public class Totems extends JavaPlugin implements Listener {
 	public static Server server;
 	public static Totems plugin;
 	public static BukkitTask asyncTask;
+	private static HashSet<Player> playerOwnerList = new HashSet<Player>();
 
 	public enum Interaction {
 		ANVIL,
@@ -55,8 +60,10 @@ public class Totems extends JavaPlugin implements Listener {
 		FIRESPREAD,
 		FLY,
 		GRASSGROW,
+		HEARTHSTONE,
 		IGNITE,
 		MAGIC,
+		MOBHEALTHBOOST,
 		MYCELGROW,
 		PLACE,
 		POISON,
@@ -139,15 +146,16 @@ public class Totems extends JavaPlugin implements Listener {
 		}
 	}
 
-//	@SuppressWarnings("unused") //Turns non-diamond, non-goldblock totems into pink wool.
-	//Eventually, this will just remove them.
+	//Removes totems not marked with a diamond- or gold-block.
 	private void checkTotemExists() {
 		log("Checking to ensure that all Totems exist...");
 		String path="";
 		Set<String> worlds = this.getConfig().getConfigurationSection("totems").getKeys(false);
+		worlds.remove("defaults");
 		for(String world : worlds){
 			if(server.getWorld(world)==null) { continue; }
 			Set<String> totems = this.getConfig().getConfigurationSection("totems."+world).getKeys(false);
+			totems.remove("defaults");
 			for(String totem:totems){
 				path = "totems."+world+"."+totem;
 				int x = getConfig().getInt(path+".x");
@@ -156,7 +164,9 @@ public class Totems extends JavaPlugin implements Listener {
 				Block block = server.getWorld(world).getBlockAt(x, y, z);
 				if(block.getTypeId()!=57 && block.getTypeId()!=41) {
 //					log(getConfig().getString(path+".owner"));
-					block.setTypeIdAndData(35, (byte) 2, false);
+//					block.setTypeIdAndData(35, (byte) 2, false);
+					this.getConfig().set(path, null);
+					log("Deleted totem "+totem+": Not a legitimate block.");
 				}
 			}
 		}
@@ -229,7 +239,9 @@ public class Totems extends JavaPlugin implements Listener {
 					flags.put("container", false);
 					flags.put("explode", false);
 					flags.put("firespread", false);
+					flags.put("hearthstone", true);
 					flags.put("ignite", false);
+					flags.put("mobHealthBoost", false);
 					flags.put("place", false);
 					flags.put("slaughter", false);
 					flags.put("stonemachine", false);
@@ -239,6 +251,7 @@ public class Totems extends JavaPlugin implements Listener {
 					flags.put("break", false);
 					flags.put("explode", false);
 					flags.put("firespread", false);
+					flags.put("hearthstone", true);
 					flags.put("place", false);
 					radius = 3f;
 					break;
@@ -275,6 +288,24 @@ public class Totems extends JavaPlugin implements Listener {
 		}
 	}
 
+	@EventHandler public void onPlayerChangeState(PlayerMoveEvent event) {
+		if(event.getFrom().equals(event.getTo())) { return; }
+		if(event.getPlayer().getItemInHand().getType().equals(Material.MAP)) {
+			Player player = event.getPlayer();
+			if(isOwner(player.getName(), player.getLocation().getBlock())) {
+				if(!playerOwnerList.contains(player)) {
+					playerOwnerList.add(player);
+					player.sendMessage("You own this area.");
+				}
+			} else {
+				if(playerOwnerList.contains(player)) {
+					playerOwnerList.remove(player);
+					player.sendMessage("You don't own this area.");
+				}
+			}
+		}
+
+	}
 	
 	/* Events to watch for =================================================================================*/
 		
@@ -284,16 +315,15 @@ public class Totems extends JavaPlugin implements Listener {
 		event.setCancelled(!canEdit(event.getPlayer(),event.getBlock(),Interaction.BREAK));
 	}
 	
-/*	@EventHandler (priority = EventPriority.LOW) public void onBlockSpread(BlockSpreadEvent event) {
+	@EventHandler (priority = EventPriority.LOW) public void onBlockSpread(BlockSpreadEvent event) {
 		//if(!event.getPlayer().hasPermission("totems.admin.unrestricted")) { return; }
 		if(event.getSource().getTypeId()==110) {
-			event.setCancelled(!canEdit("NoPlayerEvent",event.getBlock().getLocation(),Interaction.MYCELGROW));
+			event.setCancelled(!canEdit("NoPlayerEvent",event.getBlock(),Interaction.MYCELGROW));
 //			log(event.isCancelled());
 		} else if(event.getSource().getTypeId()==2) {
-			event.setCancelled(!canEdit("NoPlayerEvent",event.getBlock().getLocation(),Interaction.GRASSGROW));
+			event.setCancelled(!canEdit("NoPlayerEvent",event.getBlock(),Interaction.GRASSGROW));
 		}
 	}
-*/	
 	
 	@EventHandler public void onBlockPlace(BlockPlaceEvent event) {
 //		if(!event.getPlayer().hasPermission("totems.admin.unrestricted")) { return; }
@@ -424,7 +454,6 @@ public class Totems extends JavaPlugin implements Listener {
 //		if(!event.getPlayer().hasPermission("totems.admin.unrestricted")) { return; }
 		if(event.getPlayer().isOp()) { return; }
 		event.setCancelled(!canEdit(event.getPlayer(),event.getBlockClicked().getRelative(event.getBlockFace()),Interaction.PLACE));
-		log("water");
 	}
 
 	@EventHandler public void onPlayerShearEntity(PlayerShearEntityEvent event) {
@@ -508,6 +537,7 @@ public class Totems extends JavaPlugin implements Listener {
 						
 			HashMap<String, Double> totems = Utils.getTotemsAffectingLocation(block);
 			Set<String> keys = totems.keySet();
+			keys.remove("defaults");
 			
 			for(String key:keys){
 				path = "totems."+worldName+"."+key;
@@ -543,6 +573,35 @@ public class Totems extends JavaPlugin implements Listener {
 		} catch (NullPointerException e) { }
 
 		if(permissionScale==0) { return defaultTo; }
+		return (permissionScale>0);
+	}
+	
+	public boolean isOwner(String playerName, Block block) {
+		double permissionScale = 0.0;
+		String path;
+		String worldName = block.getWorld().getName();
+
+		try{
+			HashMap<String, Double> totems = Utils.getTotemsAffectingLocation(block);
+			Set<String> keys = totems.keySet();
+			keys.remove("defaults");
+			
+			for(String key:keys){
+				path = "totems."+worldName+"."+key;
+				try{ //if we are in the radius of a totem,
+					String ownerName = getConfig().getString(path+".owner").toLowerCase();
+					if(ownerName.equalsIgnoreCase(playerName)) {//you're a friend of this totem
+						//add distance-from-center weight to true
+						permissionScale += totems.get(key);
+					} else {//if it's not our totem, or our friend's totem,
+						//add distance-from-center weight to false
+						permissionScale -= totems.get(key);
+					}
+					
+				} catch (NullPointerException f) { }
+			}
+		} catch (NullPointerException e) { }
+
 		return (permissionScale>0);
 	}
 
