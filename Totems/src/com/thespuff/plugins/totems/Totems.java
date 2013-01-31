@@ -46,6 +46,7 @@ public class Totems extends JavaPlugin implements Listener {
 	public static Totems plugin;
 	public static BukkitTask asyncTask;
 	private static HashSet<Player> playerOwnerList = new HashSet<Player>();
+	public static Set<Totem> allTotems = new HashSet<Totem>();
 
 	public enum Interaction {
 		ANVIL,
@@ -102,15 +103,15 @@ public class Totems extends JavaPlugin implements Listener {
 
 		getServer().getPluginManager().registerEvents(this, this);
 		
-		//Let's ensure that everything is lower case in the config file.
-		fixConfigCase();
-
-		//Check that all totems are valid totems.
-		checkTotemExists();
+//		//Let's ensure that everything is lower case in the config file.
+//		fixConfigCase();
+//
+//		//Check that all totems are valid totems.
+//		checkTotemExists();
+//		setTotemMetadata(true);
 		
-		setTotemMetadata(true);
+		allTotems = Utils.getAllTotems();
 
-//		asyncTaskID = this.getServer().getScheduler().scheduleAsyncRepeatingTask(this, new Runnable() { public void run() { applyFlagEffects(); } }, 60, secondsPerPulse*20);
 		asyncTask = this.getServer().getScheduler().runTaskTimerAsynchronously(this, new Runnable() { public void run() { applyFlagEffects(); } }, 60, secondsPerPulse*20);
 		
 		log("Enabled.");
@@ -292,7 +293,7 @@ public class Totems extends JavaPlugin implements Listener {
 		if(event.getFrom().equals(event.getTo())) { return; }
 		if(event.getPlayer().getItemInHand().getType().equals(Material.MAP)) {
 			Player player = event.getPlayer();
-			if(isOwner(player.getName(), player.getLocation().getBlock())) {
+			if(Utils.isOwner(player.getName(), player.getLocation().getBlock())) {
 				if(!playerOwnerList.contains(player)) {
 					playerOwnerList.add(player);
 					player.sendMessage("You own this area.");
@@ -504,106 +505,149 @@ public class Totems extends JavaPlugin implements Listener {
 
 	/* canEdit, the queen of Sea-Cows =======================================================================*/
 	
-	public boolean canEdit(Player player, Block block, Interaction flag) {
-		if(player.isOp()) { return true; }
-		return canEdit(player.getName(), block, flag);
+	public boolean canEdit(Object player, Block block, Object flag) {
+		return Utils.canEdit(player, block, flag);
 	}
 	
-	public boolean canEdit(String player, Block block, String flag) {
-		return canEdit(player, block, Interaction.valueOf(flag.toUpperCase()));
-	}
+//	public boolean canEdit(Player player, Block block, Interaction flag) {
+//		if(player.isOp()) { return true; }
+//		return canEdit(player.getName(), block, flag);
+//	}
+//	
+//	public boolean canEdit(String player, Block block, String flag) {
+//		return canEdit(player, block, Interaction.valueOf(flag.toUpperCase()));
+//	}
+//	
+//	public boolean canEdit(Player player, Block block, String flag) {
+//		if(player.isOp()) { return true; }
+//		return canEdit(player.getName(), block, Interaction.valueOf(flag.toUpperCase()));
+//	}
+//	
+//	public boolean canEdit(String playerName, Block block, Interaction flag) {
+//		Set<Totem> totems = Utils.getTotemsAffectingLocation(block);
+//		double permission=0;
+//		
+//		for(Totem totem : totems){
+//			permission = totem.permits(playerName, flag);
+//		}
+//		return false;
+//	}
 	
-	public boolean canEdit(Player player, Block block, String flag) {
-		if(player.isOp()) { return true; }
-		return canEdit(player.getName(), block, Interaction.valueOf(flag.toUpperCase()));
-	}
+//	public boolean canDEFAULTEdit(String playerName, Block block, Interaction flag) {
+//		boolean defaultTo = true;
+//		double permissionScale = 0.0;
+//		String path;
+//		String worldName = block.getWorld().getName();
+//		boolean flagValue, isOwner;
+//		String flagName = flag.getName().toLowerCase();
+//
+//		try{
+////			Set<String> totems = getConfig().getConfigurationSection("totems."+worldName).getKeys(false);
+//			if(getConfig().contains("totems.defaults."+flagName)){
+//				defaultTo = getConfig().getBoolean("totems.defaults."+flagName);
+//			}
+//			if(getConfig().contains("totems."+worldName+".defaults."+flagName)){
+//				defaultTo = getConfig().getBoolean("totems."+worldName+".defaults."+flagName);
+//			}
+//						
+//			HashMap<String, Double> totems = Utils.getDEFAULTTotemsAffectingLocation(block);
+//			Set<String> keys = totems.keySet();
+//			keys.remove("defaults");
+//			
+//			for(String key:keys){
+//				path = "totems."+worldName+"."+key;
+//				try{ //if we are in the radius of a totem,
+//					if(getConfig().contains(path+".flags."+flagName)){
+//						flagValue = getConfig().getBoolean(path+".flags."+flagName);
+//					} else {
+//						flagValue = defaultTo;
+//					}
+//					String ownerName = getConfig().getString(path+".owner").toLowerCase();
+//					if(ownerName.equalsIgnoreCase(playerName) || //if I own this totem, or
+//							getConfig().getBoolean("totems.groups."+ownerName+"."+playerName.toLowerCase()) || //you're a friend to me or
+//							getConfig().getStringList(path+".friends").contains(playerName.toLowerCase())) {//you're a friend of this totem
+//						//add distance-from-center weight to true
+//						isOwner = true;
+//					} else {//if it's not our totem, or our friend's totem,
+//						//add distance-from-center weight to false
+//						isOwner = false;
+//					}
+//
+//					if(isOwner != flagValue) {
+//						if(defaultTo) { permissionScale += totems.get(key); }
+//						else { permissionScale -= totems.get(key); }
+//					} else {
+//						if(isOwner) { permissionScale += totems.get(key); }
+//						else { permissionScale -= totems.get(key); }
+//					}
+//
+//					
+//					
+//				} catch (NullPointerException f) { }
+//			}
+//		} catch (NullPointerException e) { }
+//
+//		if(permissionScale==0) { return defaultTo; }
+//		return (permissionScale>0);
+//	}
 	
-	public boolean canEdit(String playerName, Block block, Interaction flag) {
-		boolean defaultTo = true;
-		double permissionScale = 0.0;
-		String path;
-		String worldName = block.getWorld().getName();
-		boolean flagValue, isOwner;
-		String flagName = flag.getName().toLowerCase();
-
-		try{
-//			Set<String> totems = getConfig().getConfigurationSection("totems."+worldName).getKeys(false);
-			if(getConfig().contains("totems.defaults."+flagName)){
-				defaultTo = getConfig().getBoolean("totems.defaults."+flagName);
-			}
-			if(getConfig().contains("totems."+worldName+".defaults."+flagName)){
-				defaultTo = getConfig().getBoolean("totems."+worldName+".defaults."+flagName);
-			}
-						
-			HashMap<String, Double> totems = Utils.getTotemsAffectingLocation(block);
-			Set<String> keys = totems.keySet();
-			keys.remove("defaults");
-			
-			for(String key:keys){
-				path = "totems."+worldName+"."+key;
-				try{ //if we are in the radius of a totem,
-					if(getConfig().contains(path+".flags."+flagName)){
-						flagValue = getConfig().getBoolean(path+".flags."+flagName);
-					} else {
-						flagValue = defaultTo;
-					}
-					String ownerName = getConfig().getString(path+".owner").toLowerCase();
-					if(ownerName.equalsIgnoreCase(playerName) || //if I own this totem, or
-							getConfig().getBoolean("totems.groups."+ownerName+"."+playerName.toLowerCase()) || //you're a friend to me or
-							getConfig().getStringList(path+".friends").contains(playerName.toLowerCase())) {//you're a friend of this totem
-						//add distance-from-center weight to true
-						isOwner = true;
-					} else {//if it's not our totem, or our friend's totem,
-						//add distance-from-center weight to false
-						isOwner = false;
-					}
-
-					if(isOwner != flagValue) {
-						if(defaultTo) { permissionScale += totems.get(key); }
-						else { permissionScale -= totems.get(key); }
-					} else {
-						if(isOwner) { permissionScale += totems.get(key); }
-						else { permissionScale -= totems.get(key); }
-					}
-
-					
-					
-				} catch (NullPointerException f) { }
-			}
-		} catch (NullPointerException e) { }
-
-		if(permissionScale==0) { return defaultTo; }
-		return (permissionScale>0);
-	}
+//	public boolean isDEFAULTOwner(String playerName, Block block) {
+//		double permissionScale = 0.0;
+//		String path;
+//		String worldName = block.getWorld().getName();
+//
+//		try{
+//			HashMap<String, Double> totems = Utils.getDEFAULTTotemsAffectingLocation(block);
+//			Set<String> keys = totems.keySet();
+//			keys.remove("defaults");
+//			
+//			for(String key:keys){
+//				path = "totems."+worldName+"."+key;
+//				try{ //if we are in the radius of a totem,
+//					String ownerName = getConfig().getString(path+".owner").toLowerCase();
+//					if(ownerName.equalsIgnoreCase(playerName)) {//you're a friend of this totem
+//						//add distance-from-center weight to true
+//						permissionScale += totems.get(key);
+//					} else {//if it's not our totem, or our friend's totem,
+//						//add distance-from-center weight to false
+//						permissionScale -= totems.get(key);
+//					}
+//					
+//				} catch (NullPointerException f) { }
+//			}
+//		} catch (NullPointerException e) { }
+//
+//		return (permissionScale>0);
+//	}
 	
-	public boolean isOwner(String playerName, Block block) {
-		double permissionScale = 0.0;
-		String path;
-		String worldName = block.getWorld().getName();
-
-		try{
-			HashMap<String, Double> totems = Utils.getTotemsAffectingLocation(block);
-			Set<String> keys = totems.keySet();
-			keys.remove("defaults");
-			
-			for(String key:keys){
-				path = "totems."+worldName+"."+key;
-				try{ //if we are in the radius of a totem,
-					String ownerName = getConfig().getString(path+".owner").toLowerCase();
-					if(ownerName.equalsIgnoreCase(playerName)) {//you're a friend of this totem
-						//add distance-from-center weight to true
-						permissionScale += totems.get(key);
-					} else {//if it's not our totem, or our friend's totem,
-						//add distance-from-center weight to false
-						permissionScale -= totems.get(key);
-					}
-					
-				} catch (NullPointerException f) { }
-			}
-		} catch (NullPointerException e) { }
-
-		return (permissionScale>0);
-	}
+//	public boolean isOwner(String playerName, Block block) {
+//		double permissionScale = 0.0;
+//		String path;
+//		String worldName = block.getWorld().getName();
+//
+//		try{
+//			HashMap<String, Double> totems = Utils.getDEFAULTTotemsAffectingLocation(block);
+//			Set<String> keys = totems.keySet();
+//			keys.remove("defaults");
+//			
+//			for(String key:keys){
+//				path = "totems."+worldName+"."+key;
+//				try{ //if we are in the radius of a totem,
+//					String ownerName = getConfig().getString(path+".owner").toLowerCase();
+//					if(ownerName.equalsIgnoreCase(playerName)) {//you're a friend of this totem
+//						//add distance-from-center weight to true
+//						permissionScale += totems.get(key);
+//					} else {//if it's not our totem, or our friend's totem,
+//						//add distance-from-center weight to false
+//						permissionScale -= totems.get(key);
+//					}
+//					
+//				} catch (NullPointerException f) { }
+//			}
+//		} catch (NullPointerException e) { }
+//
+//		return (permissionScale>0);
+//	}
 
 	
 	/* Commands ==============================================================================================*/

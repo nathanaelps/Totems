@@ -6,33 +6,36 @@ import org.bukkit.block.Block;
 import com.thespuff.plugins.totems.Totems.Interaction;
 
 public class WorldTotem extends AreaTotem {
-//	protected HashMap<Interaction, Boolean> flags = new HashMap<Interaction, Boolean>();
-//	protected List<String> friends = new ArrayList<String>();
-//	protected String owner = "server";
+
 	private World world;
-	private boolean defaultTo = false;
 	
 	@Override
-	public double affects(Block block) {
-		if(block.getWorld().equals(world)) {
-			return 1;
-		}
-		return 0;
+	public boolean affects(Block block) {
+		return(block.getWorld().equals(world));
 	}
 
 	@Override
-	public double permits(String player, Block block, Interaction flag){
-		double weight = affects(block);
-		if(weight<=0) { return weight; }
-		Boolean flagValue = flags.get(flag);
-		if(flagValue==null) {
-			if(defaultTo) { return weight; }
-			else { return -weight; }
+	public boolean permits(String player, Interaction flag){
+		
+		if(flags.containsKey(flag)) { return flags.get(flag); }
+		else { return false; }
+		
+	}
+	
+	@Override
+	public double contribution(Block block) {
+		if(!affects(block)) { return 0; }
+		
+		return 1;
+	}
 
-		} else {
-			if(flagValue) { return weight; }
-			else { return -weight; }
+	@Override
+	public double summary(String player, Block block, Interaction flag) {
+		if(affects(block)) {
+			if(permits(player, flag)) { return 1; }
 		}
+		
+		return 0;
 	}
 
 }

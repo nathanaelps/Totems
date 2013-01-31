@@ -17,15 +17,51 @@ public class AreaTotem implements Totem {
 
 	
 	@Override
-	public double affects(Block block) {
+	public boolean affects(Block block) {
 		// TODO Auto-generated method stub
-		return 0;
+		return false;
 	}
 
 	@Override
-	public double permits(String player, Block block, Interaction flag) {
+	public boolean permits(String player, Interaction flag) {
+		// TODO Auto-generated method stub
+		return false;
+	}
+	
+	@Override
+	public double contribution(Block block) {
 		// TODO Auto-generated method stub
 		return 0;
+	}
+	
+	@Override
+	public double summary(String player, Block block, Interaction flag) {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+	
+	public void setFlag(Interaction flag, boolean value) {
+		flags.put(flag, value);
+	}
+	public void setFlag(String flag, boolean value) {
+		setFlag(Interaction.valueOf(flag.toUpperCase()), value);
+	}
+	public void setFlags(boolean value, Interaction... flags) {
+	    for ( int i = 0; i < flags.length; ++i ) {
+	    	setFlag(flags[i], value);
+	    }
+	}
+	
+	public void removeFlag(Interaction flag) {
+		flags.remove(flag);
+	}
+	public void removeFlag(String flag) {
+		removeFlag(Interaction.valueOf(flag.toUpperCase()));
+	}
+	public void removeFlags(Interaction... flags) {
+	    for ( int i = 0; i < flags.length; ++i ) {
+	    	removeFlag(flags[i]);
+	    }
 	}
 	
 	public void setOwner(String player){
@@ -47,11 +83,5 @@ public class AreaTotem implements Totem {
 		friends.remove(friend);
 	}
 
-	public void setFlag(String flag, boolean value) {
-		flags.put(Interaction.valueOf(flag), value);
-	}
-	public void removeFlag(String flag) {
-		flags.remove(flag);
-	}
 
 }

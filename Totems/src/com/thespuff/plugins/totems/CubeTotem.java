@@ -9,9 +9,6 @@ public class CubeTotem extends AreaTotem {
 	
 	private int radius;
 	private Block center;
-//	private HashMap<Interaction, Boolean> flags = new HashMap<Interaction, Boolean>();
-//	private List<String> friends = new ArrayList<String>();
-//	private String owner = "server";
 
 	
 	CubeTotem(String owner, Block center, int radius){
@@ -24,8 +21,40 @@ public class CubeTotem extends AreaTotem {
 		this(owner.getName(), center, radius);
 	}
 	
-	public double affects(Block block){
+	public boolean affects(Block block){
+		if(!block.getWorld().equals(center.getWorld())) { return false; }
 
+		int tX = Math.abs(block.getX()-center.getX());
+		if(tX>radius) { return false; }
+		int tZ = Math.abs(block.getZ()-center.getZ());
+		if(tZ>radius) { return false; }
+		int tY = Math.abs(block.getY()-center.getY());
+		if(tY>radius) { return false; }
+		
+		return true;
+		
+	}
+	
+	@Override
+	public boolean permits(String player, Interaction flag){
+		
+		player = player.toLowerCase();
+		
+		if(flags.containsKey(flag)) {}
+		Boolean flagValue = flags.get(flag);
+		if(flagValue==null) { return false; }
+
+		if(owner.equalsIgnoreCase(player) || //if you own this totem, or
+				friends.contains(player)) {//you're a friend of this totem
+			return flagValue;
+		} 
+
+		return false;
+	}
+	
+	@Override
+	public double contribution(Block block){
+		
 		int tX = Math.abs(block.getX()-center.getX());
 		if(tX>radius) { return 0; }
 		int tZ = Math.abs(block.getZ()-center.getZ());
@@ -33,22 +62,23 @@ public class CubeTotem extends AreaTotem {
 		int tY = Math.abs(block.getY()-center.getY());
 		if(tY>radius) { return 0; }
 		
-		if(center.getWorld().equals(block.getWorld())) {
-			return (1-((tX+tZ+tY)/(3*radius)));
-		}
+		double weight = (1-((tX+tZ+tY)/(3*radius)));
 		
-		return 0;
-		
+		return weight;
 	}
 	
-	public double permits(String player, Block block, Interaction flag){
+	@Override
+	public double summary(String player, Block block, Interaction flag){
+		
 		boolean defaultTo = true; //Is this right?
 		boolean isOwner;
 		double permissionScale = 0;
 		
 		player = player.toLowerCase();
 		
-		double weight = affects(block);
+		if(!block.getWorld().equals(center.getWorld())) { return 0; }
+
+		double weight = contribution(block);
 		
 		Boolean flagValue = flags.get(flag);
 		if(flagValue==null) { flagValue = defaultTo; }
