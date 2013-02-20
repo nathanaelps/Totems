@@ -2,9 +2,12 @@ package com.thespuff.plugins.totems;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.bukkit.block.Block;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 
 import com.thespuff.plugins.totems.Totems.Interaction;
@@ -14,41 +17,64 @@ public class AreaTotem implements Totem {
 	protected HashMap<Interaction, Boolean> flags = new HashMap<Interaction, Boolean>();
 	protected List<String> friends = new ArrayList<String>();
 	protected String owner = "server";
+	protected long precedence = Long.MIN_VALUE;
+	
+	protected Set<AreaTotem> subtotems = new HashSet<AreaTotem>();
+	protected Totem supertotem;
 
+	
+	// Overrides --------------------------------------------------------------------------
+	// Overrides --------------------------------------------------------------------------
+	// Overrides --------------------------------------------------------------------------
 	
 	@Override
 	public boolean affects(Block block) {
-		// TODO Auto-generated method stub
 		return false;
 	}
 
 	@Override
 	public boolean permits(String player, Interaction flag) {
+		return false;
+	}
+		
+	@Override
+	public void save() {
+	}
+	
+	@Override
+	public long getPrecedence() {
+		return precedence;
+	}
+
+	@Override
+	public boolean isFriendly(String player) {
 		// TODO Auto-generated method stub
 		return false;
 	}
-	
-	@Override
-	public double contribution(Block block) {
-		// TODO Auto-generated method stub
-		return 0;
-	}
-	
-	@Override
-	public double summary(String player, Block block, Interaction flag) {
-		// TODO Auto-generated method stub
-		return 0;
-	}
-	
+
+	// Totem-Specific ----------------------------------------------------------------------
+	// Totem-Specific ----------------------------------------------------------------------
+	// Totem-Specific ----------------------------------------------------------------------
+
 	public void setFlag(Interaction flag, boolean value) {
 		flags.put(flag, value);
 	}
 	public void setFlag(String flag, boolean value) {
-		setFlag(Interaction.valueOf(flag.toUpperCase()), value);
+		try {
+			setFlag(Interaction.valueOf(flag.toUpperCase()), value);
+		} catch(IllegalArgumentException e){
+		} catch(NullPointerException e) {
+		}
 	}
 	public void setFlags(boolean value, Interaction... flags) {
 	    for ( int i = 0; i < flags.length; ++i ) {
 	    	setFlag(flags[i], value);
+	    }
+	}
+	public void setFlags(ConfigurationSection config) {
+		Set<String> keys = config.getKeys(false);
+	    for (String key : keys) {
+	    	setFlag(key, config.getBoolean(key));
 	    }
 	}
 	
@@ -81,6 +107,14 @@ public class AreaTotem implements Totem {
 	}
 	public void removeFriend(String friend) {
 		friends.remove(friend);
+	}
+
+	// Utility --------------------------------------------------------------------------
+	// Utility --------------------------------------------------------------------------
+	// Utility --------------------------------------------------------------------------
+
+	public void log(Object in) {
+		System.out.println("[Totems: AreaTotem] " + String.valueOf(in));
 	}
 
 

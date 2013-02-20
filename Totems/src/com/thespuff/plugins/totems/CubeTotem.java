@@ -1,6 +1,12 @@
 package com.thespuff.plugins.totems;
 
+
+import java.text.SimpleDateFormat;
+import java.util.Set;
+
+import org.bukkit.World;
 import org.bukkit.block.Block;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 
 import com.thespuff.plugins.totems.Totems.Interaction;
@@ -11,16 +17,67 @@ public class CubeTotem extends AreaTotem {
 	private Block center;
 
 	
-	CubeTotem(String owner, Block center, int radius){
+	public CubeTotem(String owner, Block center, int radius){
 		this.owner = owner;
 		this.center = center;
 		this.radius = radius;
+		
+		//TODO: Is this really the best way to do this?
+		this.precedence = Long.parseLong(new SimpleDateFormat("yyyyMMddHHmmss").toString());
 	}
 
-	CubeTotem(Player owner, Block center, int radius){
+	public CubeTotem(Player owner, Block center, int radius){
 		this(owner.getName(), center, radius);
 	}
 	
+	public CubeTotem(ConfigurationSection config) {
+		try{
+			owner = config.getString("owner");
+			precedence = config.getLong("precedence");
+
+			
+			World world = Totems.server.getWorld(config.getString("world"));
+			int x = config.getInt("x");
+			int y = config.getInt("y");
+			int z = config.getInt("z");
+			center = world.getBlockAt(x,y,z);
+			
+			radius = config.getInt("radius");
+
+			if(config.contains("flags")){
+				setFlags(config.getConfigurationSection("flags"));
+			}
+		} catch (NullPointerException e) {
+			log("Failed to load totem.");
+		}
+	}
+	
+	@Override
+	public void save(){
+		String totemName = String.format("%05d", center.getX())+String.format("%05d", center.getY())+String.format("%05d", center.getZ());
+		String worldName = center.getWorld().getName();
+		String path = "world."+worldName+".totems."+totemName+".";
+
+		Totems.plugin.getConfig().set(path+"owner", owner);
+		Totems.plugin.getConfig().set(path+"precedence", precedence);
+		
+		Totems.plugin.getConfig().set(path+"radius", radius);
+		Totems.plugin.getConfig().set(path+"world", center.getWorld().getName());
+		Totems.plugin.getConfig().set(path+"x", center.getX());
+		Totems.plugin.getConfig().set(path+"y", center.getY());
+		Totems.plugin.getConfig().set(path+"z", center.getZ());
+
+		Set<Interaction> flagKeys = flags.keySet();
+		for(Interaction flag : flagKeys){
+			Totems.plugin.getConfig().set(path+"flags."+flag.getName(), flags.get(flag));
+		}  
+	}
+	
+	public Block getCenter(){
+		return center;
+	}
+	
+	@Override
 	public boolean affects(Block block){
 		if(!block.getWorld().equals(center.getWorld())) { return false; }
 
@@ -52,55 +109,4 @@ public class CubeTotem extends AreaTotem {
 		return false;
 	}
 	
-	@Override
-	public double contribution(Block block){
-		
-		int tX = Math.abs(block.getX()-center.getX());
-		if(tX>radius) { return 0; }
-		int tZ = Math.abs(block.getZ()-center.getZ());
-		if(tZ>radius) { return 0; }
-		int tY = Math.abs(block.getY()-center.getY());
-		if(tY>radius) { return 0; }
-		
-		double weight = (1-((tX+tZ+tY)/(3*radius)));
-		
-		return weight;
-	}
-	
-	@Override
-	public double summary(String player, Block block, Interaction flag){
-		
-		boolean defaultTo = true; //Is this right?
-		boolean isOwner;
-		double permissionScale = 0;
-		
-		player = player.toLowerCase();
-		
-		if(!block.getWorld().equals(center.getWorld())) { return 0; }
-
-		double weight = contribution(block);
-		
-		Boolean flagValue = flags.get(flag);
-		if(flagValue==null) { flagValue = defaultTo; }
-
-		if(owner.equalsIgnoreCase(player) || //if you own this totem, or
-				friends.contains(player)) {//you're a friend of this totem
-			//add distance-from-center weight to true
-			isOwner = true;
-		} else {//if it's not our totem, or our friend's totem,
-			//add distance-from-center weight to false
-			isOwner = false;
-		}
-
-		if(isOwner != flagValue) {
-			if(defaultTo) { permissionScale += weight; }
-			else { permissionScale -= weight; }
-		} else {
-			if(isOwner) { permissionScale += weight; }
-			else { permissionScale -= weight; }
-		}
-
-		return permissionScale;
-	}
-
 }

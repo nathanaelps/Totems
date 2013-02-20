@@ -1,37 +1,22 @@
 package com.thespuff.plugins.totems;
 
+import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.bukkit.Location;
 import org.bukkit.Server;
 import org.bukkit.World;
 import org.bukkit.block.Block;
-import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 
 import com.thespuff.plugins.totems.Totems.Interaction;
 
 public class Utils {
 
-//	private static String pluginName = Totems.pluginName;
-//	private static String pluginVersion = Totems.pluginVersion;
 	private static Server server = Totems.server;
 	private static Totems plugin = Totems.plugin;
 	
-	public static HashMap<String,Block> getTotems(){
-		HashMap<String,Block> out = new HashMap<String,Block>();
-		List<World> worldList = server.getWorlds();
-		for(World world : worldList){
-			try{
-				out.putAll(getTotems(world.getName()));
-			}catch(NullPointerException e) {/*Do Nothing*/}
-		}
-		return out;
-	}
-
 	public static boolean setWorldDefault(World world, String flag, boolean wDefault) {
 		if(Interaction.valueOf(flag.toUpperCase()) == null) { return false; }
 		
@@ -75,38 +60,6 @@ public class Utils {
 		return out;
 	}
 	
-//	public static HashMap<String,Double> getDEFAULTTotemsAffectingLocation(Location location) {
-//		return getDEFAULTTotemsAffectingLocation(location.getBlock());
-//	}
-//	
-//	public static HashMap<String,Double> getDEFAULTTotemsAffectingLocation(Block block) {
-//		String path = "";
-//		String world = block.getWorld().getName();
-//		HashMap<String,Double> out = new HashMap<String,Double>();
-//		double radius = 0.0;
-//		int tX,tY,tZ;
-//		int x = block.getX();
-//		int y = block.getY();
-//		int z = block.getZ();
-//		
-//		Set<String> totems = plugin.getConfig().getConfigurationSection("totems."+world).getKeys(false);
-//		for(String totem:totems){
-//			if(totem.equals("defaults")) { continue; }
-//			path = "totems."+world+"."+totem;
-//			radius = plugin.getConfig().getDouble(path+".radius");
-//			tX = Math.abs(plugin.getConfig().getInt(path+".x")-x);
-//			if(tX>radius) { continue; }
-//			tZ = Math.abs(plugin.getConfig().getInt(path+".z")-z);
-//			if(tZ>radius) { continue; }
-//			tY = Math.abs(plugin.getConfig().getInt(path+".y")-y);
-//			if(tY>radius) { continue; }
-//			out.put(totem, 1-((tX+tZ+tY)/(3*radius)));
-//		}
-//		
-//		out.remove("defaults");
-//		return out;
-//	}
-	
 	/* canEdit, the queen of Sea-Cows =======================================================================*/
 	
 	public static boolean canEdit(Object player, Block block, Object flag) {
@@ -130,60 +83,53 @@ public class Utils {
 	}
 		
 	public static boolean canEditMeat(String playerName, Block block, Interaction flag) {
-		Set<Totem> totems = Utils.getTotemsAffectingLocation(block);
-		double permission=0;
 		
-		for(Totem totem : totems){
-			permission += totem.contribution(block);
+		World world = block.getWorld();
+		
+		
+		AreaTotem temp = new AreaTotem();
+
+		boolean byDefault = Totems.worldTotems.get(block.getWorld()).permits(playerName, flag);
+
+		for(AreaTotem totem : Totems.areaTotems){
+			if(totem.affects(block) && totem.getPrecedence()>temp.getPrecedence()){
+				temp = totem;
+			}
 		}
-		return (permission>0);
+		
+		String ownerName = temp.getOwner();
+				
+		boolean byFriendly = ( temp.isFriendly(playerName) || Totems.friendList.get(ownerName).friendlyTowards(playerName) );
+		
+		//World Default, Is Totem Owner, Totem Permits: Two out of three makes it true.
+		
+		if((byFlag && (byDefault || byFriendly)) || (byDefault && byFriendly)) { return true; }
+		return false;
 	}
 	
 	/* End canEdit =======================================================================*/
 	
-	public static Set<Totem> getTotemsAffectingLocation(Location location) {
-		return getTotemsAffectingLocation(location.getBlock());
-	}
-	
+	public static Totem getAffectiveTotem(Block block){
+		AreaTotem out = new AreaTotem();
 
-	public static Set<Totem> getTotemsAffectingLocation(Block block) {
-		Set<Totem> out = new HashSet<Totem>();
-
-		for(Totem totem : Totems.allTotems){
-			if(totem.affects(block)){
-				out.add(totem);
+		for(AreaTotem totem : Totems.areaTotems){
+			if(totem.affects(block) && totem.getPrecedence()>out.getPrecedence()){
+				out = totem;
 			}
 		}
-		
+
 		return out;
 	}
 	
 	public static boolean isOwner(Object player, Block block) {
-		double permissionScale = 0.0;
-		String inPlayer = "";
-		
+		String playerName = "";
 		if(player instanceof String) {
-			inPlayer = (String) player;
+			playerName = (String) player;
 		} else if (player instanceof Player) {
-			inPlayer = ((Player) player).getName();
-		} else {
-			return false;
+			playerName = ((Player) player).getName();
 		}
-		
-		Set<Totem> totems = getTotemsAffectingLocation(block);
-
-		for(Totem totem:totems){
-			double contribution = totem.contribution(block);
-			if(contribution>0) {
-				if(totem.getOwner().equalsIgnoreCase(inPlayer)) {
-					permissionScale += contribution;
-				} else {
-					permissionScale -= contribution;
-				}
-			}
-		}
-
-		return (permissionScale>0);
+		if(getAffectiveTotem(block).getOwner().equalsIgnoreCase(playerName)) { return true; }
+		return false;
 	}
 
 
@@ -192,49 +138,56 @@ public class Utils {
 		
 	}
 
-	public static Set<Totem> getAllTotems() {
-		Set<Totem> out = new HashSet<Totem>();
-
-		List<World> worldList = server.getWorlds();
+	public static void loadFriendListsFromConfig() {
 		
-		for(World world : worldList){
-			
-			String path="";
-			try{
-				Set<String> totems = plugin.getConfig().getConfigurationSection("totems."+world.getName()).getKeys(false);
-				totems.remove("defaults");
-				for(String totem:totems){
-					if(totem.equalsIgnoreCase("defaults")) { continue; }
-					path = "totems."+world.getName()+"."+totem;
-					
-					String owner = plugin.getConfig().getString(path+".owner");
-					
-					int x = plugin.getConfig().getInt(path+".x");
-					int z = plugin.getConfig().getInt(path+".z");
-					int y = plugin.getConfig().getInt(path+".y");
-					Block block = world.getBlockAt(x, y, z);
-					
-					int radius = plugin.getConfig().getInt(path+".radius");
+//		Set<Totem> allTotems = Totems.allTotems;
+		HashMap<String, FriendList> friendList = Totems.friendList;
+				
+		// Load world defaults
 
-					CubeTotem area = new CubeTotem(owner, block, radius);
-					
-					 Set<String> flags = Totems.plugin.getConfig().getConfigurationSection(path+".flags").getKeys(false);
-					 
-					 for(String flag: flags){
-						 area.setFlag(flag, Totems.plugin.getConfig().getBoolean(path+".flags."+flag));
-					 }
-					
-					out.add(area);
-				}
-			} catch(NullPointerException e) {
-				plugin.log("No totems recorded for world "+ world.getName());
-				return null;
-			}
-
-			out.remove("defaults");
+		Set<String> playerNames = plugin.getConfig().getConfigurationSection("friendlist").getKeys(false);
+		for(String playerName:playerNames){
+			friendList.put(playerName, new FriendList(playerName, plugin.getConfig().getConfigurationSection("friendlist."+playerName)));
 		}
+	}
+	
+	public static void loadTotemsFromConfig() {
+		
+//		Set<Totem> allTotems = Totems.allTotems;
+		HashMap<World, WorldTotem> worldTotems = Totems.worldTotems;
+		Set<AreaTotem> areaTotems = Totems.areaTotems;
+		
+		// Load server defaults
+		
+//		allTotems.add(new ServerTotem(plugin.getConfig().getConfigurationSection("defaults")));
+		
+		// Load world defaults
 
+		List<World> worlds = server.getWorlds();
+		for(World world:worlds){
+			if(!plugin.getConfig().contains("world."+world.getName())) { continue; }
+			worldTotems.put(world, new WorldTotem(world.getName(), plugin.getConfig().getConfigurationSection("world."+world.getName())));
 
-		return out;
+			// While we're here, Load totems for world
+			Set<String> totemNames = plugin.getConfig().getConfigurationSection("world."+world.getName()+".totems").getKeys(false);
+			for(String totemName:totemNames){
+				areaTotems.add(new CubeTotem(plugin.getConfig().getConfigurationSection("world."+world.getName()+".totems."+totemName)));
+			
+			}
+		}
+	}
+
+	public static void saveTotemsToConfig() {
+		
+		Collection<WorldTotem> worldTotems = Totems.worldTotems.values();
+		
+		for(Totem totem : worldTotems){
+			totem.save();
+		}
+		
+		for(Totem totem : Totems.areaTotems){
+			totem.save();
+		}
+		plugin.saveConfig();
 	}
 }

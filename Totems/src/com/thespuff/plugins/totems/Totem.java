@@ -22,23 +22,32 @@ public interface Totem {
 	public boolean permits(String player, Interaction flag);
 	
 	/**
-	 * How much does this totem affect this block?
-	 * @param block The block affected
+	 * Returns the state of the flag.
+	 * @param flag The flag to check.
 	 * @return
 	 */
-	public double contribution(Block block);
+	public boolean getFlag(Interaction flag);
 	
 	/**
-	 * Summary of the totemic effect on this player at this block.
-	 * Returns a negative number for denial, a positive number for permission,
-	 * and 0 if there is no effect.
-	 * @param player
-	 * @param block
-	 * @param flag
+	 * Is this player friendly to this totem?
+	 * Includes the owner.
+	 * @param player The player to be tested
 	 * @return
 	 */
-	public double summary(String player, Block block, Interaction flag);
+	public boolean isFriendly(String player);
 	
+	/**
+	 * Returns the owner of this totem as a string.
+	 * @return The name of the totem owner.
+	 */
 	public String getOwner();
+
+	/**
+	 * Adds the totem to the currently loaded Config file.
+	 * Does not save the file, only adds the totem.
+	 */
+	public void save();
+
+	public long getPrecedence();
 	
 }
